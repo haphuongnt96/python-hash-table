@@ -4,6 +4,7 @@ from attr import has
 from hashtable import HashTable
 import pytest
 from pytest_unordered import unordered
+from unittest.mock import patch
 
 @pytest.fixture
 def hash_table():
@@ -19,13 +20,16 @@ def test_should_create_hashtable():
 def test_should_report_length_of_empty_hash_table():
     assert len(HashTable(capacity=100)) == 0
 
+def test_should_report_length(hash_table):
+    assert len(hash_table) == 3
+
 def test_should_create_empty_value_slots():
     # Given
     expected_values = [None, None, None]
     hash_table = HashTable(capacity=3)
 
     # When
-    actual_values = hash_table._pairs
+    actual_values = hash_table._slots
 
     # Then
     assert actual_values == expected_values
@@ -173,3 +177,114 @@ def test_should_not_create_hash_table_with_zero_capacity():
 def test_should_not_create_hash_table_with_negative_capacity():
     with pytest.raises(ValueError):
         HashTable(capacity=-3)
+
+def test_should_report_capacity_of_empty_hash_table():
+    assert HashTable(capacity=100).capacity == 100
+
+def test_should_report_capacity(hash_table):
+    assert hash_table.capacity == 100
+
+def test_should_iterate_over_keys(hash_table):
+    for key in hash_table.keys:
+        assert key in ('holla', 98.6, False)
+
+def test_should_iterate_over_values(hash_table):
+    for value in hash_table.values:
+        assert value in ('hello', 37, True)
+
+def test_should_iterate_over_pairs(hash_table):
+    for key, value in hash_table.pairs:
+        assert key in hash_table.keys
+        assert value in hash_table.values
+
+def test_should_iterate_over_instance(hash_table):
+    for key in hash_table:
+        assert key in ('holla', 98.6, False)
+
+def test_should_use_dict_literal_for_str(hash_table):
+    assert str(hash_table) in {        
+        "{'holla': 'hello', 98.6: 37, False: True}",
+        "{'holla': 'hello', False: True, 98.6: 37}",
+        "{98.6: 37, 'holla': 'hello', False: True}",
+        "{98.6: 37, False: True, 'holla': 'hello'}",
+        "{False: True, 'holla': 'hello', 98.6: 37}",
+        "{False: True, 98.6: 37, 'holla': 'hello'}",
+    }
+
+def test_should_create_hashtable_from_dict():
+    dictionary = {"holla": "hello", 98.6: 37, False: True}
+    hash_table = HashTable.from_dict(dictionary)
+
+    assert hash_table.capacity == len(dictionary) * 10
+    assert hash_table.keys == set(dictionary.keys())
+    assert hash_table.pairs == set(dictionary.items())
+    assert unordered(hash_table.values) == list(dictionary.values())
+
+def test_should_create_hashtable_from_dict_with_custom_capacity():
+    dictionary = {"holla": "hello", 98.6: 37, False: True}
+
+    hash_table = HashTable.from_dict(dictionary, capacity=100)
+
+    assert hash_table.capacity == 100
+    assert hash_table.keys == set(dictionary.keys())
+    assert hash_table.pairs == set(dictionary.items())
+    assert unordered(hash_table.values) == list(dictionary.values())
+
+def test_should_have_canonical_string_representation(hash_table):
+    assert repr(hash_table) in {
+        "HashTable.from_dict({'holla': 'hello', 98.6: 37, False: True})",
+        "HashTable.from_dict({'holla': 'hello', False: True, 98.6: 37})",
+        "HashTable.from_dict({98.6: 37, 'holla': 'hello', False: True})",
+        "HashTable.from_dict({98.6: 37, False: True, 'holla': 'hello'})",
+        "HashTable.from_dict({False: True, 'holla': 'hello', 98.6: 37})",
+        "HashTable.from_dict({False: True, 98.6: 37, 'holla': 'hello'})",
+    }
+
+def test_should_compare_equal_to_itself(hash_table):
+    assert hash_table == hash_table
+
+def test_should_compare_equal_to_copy(hash_table):
+    assert hash_table is not hash_table.copy()
+    assert hash_table == hash_table.copy()
+
+def test_should_compare_equal_with_different_pairs_order():
+    h1 = HashTable.from_dict({"a": 1, "b": 2, "c": 3})
+    h2 = HashTable.from_dict({"b": 2, "a": 1, "c": 3})
+    assert h1 == h2
+
+def test_should_compare_not_equal_with_different_key_value_sets(hash_table):
+    other = HashTable.from_dict({"holla": "hello", 98.6: 37, False: "different value"})
+    assert hash_table != other
+
+def test_should_compare_not_equal_to_other_datatypes(hash_table):
+    assert hash_table != 113
+
+def test_should_copy_keys_values_pairs_capacity(hash_table):
+    copy = hash_table.copy()
+    assert copy is not hash_table
+    assert set(hash_table.keys) == set(copy.keys)
+    assert set(hash_table.pairs) == set(copy.pairs)
+    assert unordered(hash_table.values) == copy.values
+    assert hash_table.capacity == copy.capacity
+
+def test_should_compare_equal_with_different_capacity():
+    dictionary = {"a": 1, "b": 2, "c": 3}
+    h1 = HashTable.from_dict(dictionary, capacity=50)
+    h2 = HashTable.from_dict(dictionary, capacity=100)
+    assert h1 == h2
+
+def test_should_create_new_key_value_pairs_update_method(hash_table):
+    hash_table.update({"a": 1, "b": 2})
+    assert set(hash_table.pairs) == {('holla', 'hello'), (98.6, 37), (False, True), ("a", 1), ("b", 2)}
+    hash_table.update(c=3, d=4)
+    assert set(hash_table.pairs) == {('holla', 'hello'), (98.6, 37), (False, True), ("a", 1), ("b", 2), ("c", 3), ("d", 4)}
+
+def test_should_update_existing_key_value_pair_update_method(hash_table):
+    hash_table.update({"holla": "nana", False: False})
+    assert set(hash_table.pairs) == {('holla', 'nana'), (98.6, 37), (False, False)}
+    hash_table.update({98.6: 100}, holla=5)
+    assert set(hash_table.pairs) == {('holla', 5), (98.6, 100), (False, False)}
+
+@patch("builtins.hash", return_value=42)
+def test_should_detect_hash_collision(hash_mock):
+    assert hash("foobar") == 42
